@@ -121,11 +121,12 @@ describe("CSP documentation (next.config.ts) — #679", () => {
     expect(config).toContain("src/proxy.ts");
   });
 
-  it("keeps the documented policy in sync with src/proxy.ts (unsafe-inline retained)", () => {
-    // src/proxy.ts keeps 'unsafe-inline' because the per-request nonce never
-    // reaches the App Router renderer; the comment must not overstate the
-    // policy by claiming a nonce-based CSP that is not in place.
-    expect(read("src/proxy.ts")).toContain("'unsafe-inline'");
+  it("keeps the documented policy in sync with the policy module (unsafe-inline retained)", () => {
+    // The CSP moved into src/lib/security-policy.ts (#765), which keeps
+    // 'unsafe-inline' because the per-request nonce never reaches the App
+    // Router renderer; the comment must not overstate the policy by claiming a
+    // nonce-based CSP that is not in place.
+    expect(read("src/lib/security-policy.ts")).toContain("'unsafe-inline'");
     expect(config).toContain("unsafe-inline");
   });
 });

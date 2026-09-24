@@ -5,12 +5,17 @@ import type { NextRequest } from "next/server";
 import {
   buildRateLimitKey,
   formatRateLimitHeaders,
-  getClientIp,
   getRateLimitStore,
   RATE_LIMIT_MESSAGE,
 } from "@/lib/rate-limit";
 import { ERROR_CODES, errorEnvelope } from "@/lib/error-codes";
 import { logger } from "@/lib/logger";
+import {
+  buildCspHeader,
+  clientIpFromHeaders,
+  rateLimitMax,
+  rateLimitWindowMs,
+} from "@/lib/security-policy";
 
 // The global per-IP bucket uses the same store/interface and header writer as
 // the Node route handlers (issue #759). `RATE_LIMIT_MAX` is kept as a module
@@ -18,12 +23,10 @@ import { logger } from "@/lib/logger";
 // the previous behaviour.
 const GLOBAL_RATE_LIMIT_SCOPE = "global";
 
-const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
+// Policy values come from @/lib/security-policy (issue #765).
+const RATE_LIMIT_WINDOW_MS = rateLimitWindowMs();
 // Configurable via RATE_LIMIT_RPM env (defaults to 120 requests/min/IP)
-const RATE_LIMIT_MAX = Math.max(
-  1,
-  parseInt(process.env.RATE_LIMIT_RPM || "120", 10) || 120
-);
+const RATE_LIMIT_MAX = rateLimitMax();
 
 // Global rate-limit store, resolved once per instance.
 //
@@ -37,39 +40,13 @@ const rateLimitStore = getRateLimitStore();
 
 const isProd = process.env.NODE_ENV === "production";
 
-function generateRequestId(): string {
-  return `req_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+/** Resolve the client IP using the precedence declared in the policy. */
+function getClientIp(request: NextRequest): string {
+  return clientIpFromHeaders((header) => request.headers.get(header));
 }
 
-/**
- * Content-Security-Policy for HTML pages.
- *
- * Next.js (App Router) injects inline streaming/hydration scripts, and this
- * Next 16 build does not propagate a per-request nonce (via x-nonce or a
- * request-header CSP) to the app renderer, so a script-src without
- * 'unsafe-inline' blocks them and the app never hydrates. We therefore keep
- * 'unsafe-inline' in script-src while every other directive stays strict
- * (default-src 'self', connect-src whitelisted to Stellar endpoints only,
- * frame-src limited to wallet extensions, object-src 'none', ...).
- * Development additionally needs 'unsafe-eval' for HMR / Fast Refresh.
- */
-function buildCsp(): string {
-  const scriptSrc = isProd
-    ? "'self' 'unsafe-inline' 'wasm-unsafe-eval'"
-    : "'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'";
-  return [
-    "default-src 'self'",
-    `script-src ${scriptSrc}`,
-    "style-src 'self' 'unsafe-inline'",
-    // Horizon + Soroban RPC + Stellar Expert
-    "connect-src 'self' https://horizon-testnet.stellar.org https://horizon.stellar.org https://soroban-testnet.stellar.org https://soroban.stellar.org https://rpc-futurenet.stellar.org https://mainnet.soroban.rpc.pulse.so",
-    "img-src 'self' data: https://stellar.expert https://raw.githubusercontent.com",
-    "font-src 'self'",
-    "frame-src 'self' https://*.freighter.app chrome-extension: moz-extension:",
-    "object-src 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-  ].join("; ");
+function generateRequestId(): string {
+  return `req_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export async function proxy(request: NextRequest) {
@@ -172,7 +149,8 @@ export async function proxy(request: NextRequest) {
 
   // ── HTML pages: CSP + security headers ──────────────────────
   const response = NextResponse.next();
-  response.headers.set("Content-Security-Policy", buildCsp());
+  // The directive list lives in @/lib/security-policy; this only serialises it.
+  response.headers.set("Content-Security-Policy", buildCspHeader(isProd));
   response.headers.set("X-Request-Id", requestId);
   response.headers.set("X-Api-Version", "1.0.0");
   response.headers.set("X-Content-Type-Options", "nosniff");
