@@ -650,6 +650,9 @@ Cancels a pending payment.
 
 ## Escrows
 
+The HTTP surface for escrows — endpoints, request/response examples, state machine and error handling —
+is documented in [ESCROWS_AND_STREAMS.md](./ESCROWS_AND_STREAMS.md); this section is the function-level reference.
+
 ### `create_escrow(depositor: Address, beneficiary: Address, arbiter: Option<Address>, amount: i128, asset: Address, deadline: u64, metadata: String) -> Result<u64, PaymentError>`
 
 Creates an escrow; returns the escrow ID.
@@ -694,6 +697,8 @@ Returns the number of escrows.
 ---
 
 ## Streams
+
+The same HTTP treatment for streams is in [ESCROWS_AND_STREAMS.md](./ESCROWS_AND_STREAMS.md).
 
 ### `create_stream(creator: Address, recipient: Address, total_amount: i128, asset: Address, start_time: u64, end_time: u64, metadata: String) -> Result<u64, PaymentError>`
 
