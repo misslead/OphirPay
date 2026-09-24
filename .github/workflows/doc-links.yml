@@ -1,0 +1,39 @@
+name: Documentation links
+
+# Issue #769 — the repository ships fifty-odd markdown files (docs/, the
+# translated READMEs, the audit reports) and nothing checked their links, so a
+# renamed heading left the table of contents pointing at a dead anchor and a
+# moved path left a "see also" link 404ing — invisible until a reader hits it.
+#
+# This job fails on a missing relative file or a heading that does not exist,
+# reporting `path:line`. External URLs are deliberately not probed: the network
+# is not a build input, and a third-party outage should not fail a pull request.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    # `integration/staging` is the batch-integration branch every PR must
+    # target while it exists, so the check has to run there too.
+    branches: [main, integration/staging]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: doc-links-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  doc-links:
+    name: "📝 Docs — link check"
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Check every internal link and anchor
+        run: node scripts/check-doc-links.mjs

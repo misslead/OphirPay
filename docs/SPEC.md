@@ -4,7 +4,10 @@
 
 This document defines the formal invariants that the OphirPay Soroban contract
 MUST maintain across all operations. These invariants serve as the foundation
-for testing, auditing, and formal verification.
+for testing, auditing, and formal verification. The Kani harnesses in
+[contracts/ophirpay/spec/src/invariants.rs](../contracts/ophirpay/spec/src/invariants.rs)
+check hand-written models of these invariants, not the deployed contract — see the
+trust/claim finding in [AUDIT.md](./AUDIT.md).
 
 ---
 
@@ -318,7 +321,10 @@ cd contracts/emitter && cargo test                              # emitter unit t
 ## Future Verification Work
 
 - [x] Property testing with `proptest` for token-moving paths & reentrancy sequences (`LOCKED_BALANCE` conservation)
-- [ ] Bounded model checking with `kani` for the 5 highest-risk invariants
+- [ ] Bounded model checking with `kani` for the 5 highest-risk invariants.
+      The harnesses in [contracts/ophirpay/spec/src/invariants.rs](../contracts/ophirpay/spec/src/invariants.rs)
+      model the invariants by hand, share no code with the contract, and are not run in CI —
+      see the trust/claim finding in [AUDIT.md](./AUDIT.md).
 - [ ] Formal verification of the `compute_vested()` function (overflow safety).
       The boundary branches are modelled in `contracts/ophirpay/spec/src/invariants.rs`,
       but the widened multiply path is not yet machine-checked — see the Kani
